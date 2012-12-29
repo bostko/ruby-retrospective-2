@@ -10,6 +10,8 @@ end
 
 
 class Collection
+  include Enumerable
+
   attr_reader :songs
   private
   def initialize(songs)
@@ -17,9 +19,8 @@ class Collection
   end
 
   public
-
   def adjoin(collection)
-    Collection.new(collection.songs & @songs)
+    Collection.new(collection.songs | @songs)
   end
 
   def each(&block)
@@ -34,22 +35,20 @@ class Collection
     Collection.new(song_array)
   end
 
-  def names
-    @songs.map { |song| song.name }
+  def artists
+    @songs.map(&:artist).uniq
   end
 
-  def artists
-    @songs.map { |song| song.artist }
+  def names
+    @songs.map(&:name).uniq
   end
 
   def albums
-    @songs.map { |song| song.album }
+    @songs.map(&:album).uniq
   end
 
   def filter(criteria)
-    @songs.select do |song|
-      criteria.match(song)
-    end
+    Collection.new(@songs.select { |song| criteria.match(song) })
   end
 end
 
@@ -88,13 +87,13 @@ class Criteria
     self
   end
 
-  private
   def match(song)
-    @operation ? match_operation :
+    @operation ? match_operation(song) :
         match_single(song)
   end
 
-  def match_operation
+  protected
+  def match_operation(song)
     case @operation
       when :& then match_single(song) && @other.match_single(song)
       when :| then match_single(song) || @other.match_single(song)
@@ -106,5 +105,9 @@ class Criteria
     @search[:name] && @search[:name] == song.name ||
         @search[:artist] && @search[:artist] == song.artist ||
         @search[:album] &&  @search[:album] == song.album
+  end
+
+  def add(songs)
+    @songs + songs
   end
 end

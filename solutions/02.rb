@@ -13,16 +13,13 @@ class Collection
   include Enumerable
 
   attr_reader :songs
+
   private
   def initialize(songs)
     @songs = songs
   end
 
   public
-  def adjoin(collection)
-    Collection.new(collection.songs | @songs)
-  end
-
   def each(&block)
     @songs.each(&block)
   end
@@ -47,67 +44,48 @@ class Collection
     @songs.map(&:album).uniq
   end
 
-  def filter(criteria)
-    Collection.new(@songs.select { |song| criteria.match(song) })
+  def filter(creteria)
+    Collection.new( @songs.select{ |song| creteria.call(song) } )
+  end
+
+  def adjoin(collection)
+    list_of_songs = @songs
+    collection.each{ |song| list_of_songs << song }
+    Collection.new( list_of_songs )
   end
 end
 
 
 class Criteria
-  def self.name(name)
-    Criteria.new(:name => name)
+  def initialize(filter)
+    @filter = filter
   end
 
-  def self.artist(artist)
-    Criteria.new(:artist => artist)
+  def Criteria.name(name)
+    Criteria.new( Proc.new{ |song| song.name == name } )
   end
 
-  def self.album(album)
-    Criteria.new(:album => album)
+  def Criteria.artist(artist)
+    Criteria.new( Proc.new{ |song| song.artist == artist } )
   end
 
-  def initialize(search)
-    @search = search
-  end
-
-  def &(other)
-    @operation = :&
-    @other = other
-    self
-  end
-
-  def |(other)
-    @operation = :|
-    @other = other
-    self
+  def Criteria.album(album)
+    Criteria.new( Proc.new{ |song| song.album == album } )
   end
 
   def !
-    @operation = :!
-    self
+    Criteria.new( Proc.new{ |song| not call(song) } )
   end
 
-  def match(song)
-    @operation ? match_operation(song) :
-        match_single(song)
+  def &(other)
+    Criteria.new( Proc.new{ |song| call(song) and other.call(song) } )
   end
 
-  protected
-  def match_operation(song)
-    case @operation
-      when :& then match_single(song) && @other.match_single(song)
-      when :| then match_single(song) || @other.match_single(song)
-      when :! then ! match_single(song)
-    end
+  def |( other )
+    Criteria.new( Proc.new{ |song| call(song) or other.call(song) } )
   end
 
-  def match_single(song)
-    @search[:name] && @search[:name] == song.name ||
-        @search[:artist] && @search[:artist] == song.artist ||
-        @search[:album] &&  @search[:album] == song.album
-  end
-
-  def add(songs)
-    @songs + songs
+  def call( song )
+    @filter.call( song )
   end
 end
